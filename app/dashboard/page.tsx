@@ -1,429 +1,218 @@
+// app/dashboard/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { tokenStorage, type User } from "@/lib/api";
+import Sidebar from "../components/Sidebar";
+import { tokenStorage } from "@/lib/api";
 
-// ============================================================
-// TYPES
-// ============================================================
-type Product = {
-  name: string;
-  category: string;
-  price: string;
-  stock: number;
-  sku: string;
-};
-
-type Transaction = {
-  id: string;
-  customer: string;
-  date: string;
-  total: number;
-  status: string;
-};
-
-// ============================================================
-// DATA DUMMY (untuk demo dashboard)
-// ============================================================
-const defaultProducts: Product[] = [
-  { name: "Nugget Ayam", category: "Nugget", price: "Rp 35.000", stock: 3, sku: "NG001" },
-  { name: "Bakso Sapi", category: "Bakso", price: "Rp 40.000", stock: 7, sku: "BS002" },
-  { name: "Sosis Ayam", category: "Sosis", price: "Rp 28.000", stock: 9, sku: "SA003" },
-  { name: "Dimsum Ayam", category: "Dimsum", price: "Rp 32.000", stock: 25, sku: "DM004" },
-  { name: "Kentang Frozen", category: "Frozen Food", price: "Rp 27.000", stock: 31, sku: "KF005" },
-  { name: "Chicken Wings", category: "Ayam", price: "Rp 45.000", stock: 18, sku: "CW006" },
-];
-
-const defaultTransactions: Transaction[] = [
-  { id: "TRX-001", customer: "Andi Saputra", date: "30 Sep 2026", total: 125000, status: "Selesai" },
-  { id: "TRX-002", customer: "Budi Santoso", date: "29 Sep 2026", total: 85000, status: "Diproses" },
-  { id: "TRX-003", customer: "Citra Lestari", date: "28 Sep 2026", total: 210000, status: "Selesai" },
-  { id: "TRX-004", customer: "Dimas Pratama", date: "27 Sep 2026", total: 75000, status: "Menunggu" },
-];
-
-// ============================================================
-// DASHBOARD PAGE
-// ============================================================
 export default function DashboardPage() {
   const router = useRouter();
+  const [products, setProducts] = useState<any[]>([]);
+  const [stats, setStats] = useState({ total: 0, lowStock: 0, revenue: 0 });
+  
+  // State untuk Modal Update Stok (Poin 6 & 12)
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [stockUpdates, setStockUpdates] = useState<Record<string, number>>({});
 
-  // ===== STATE AUTH =====
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isChecking, setIsChecking] = useState(true);
-
-  // ===== STATE DATA =====
-  const [products, setProducts] = useState<Product[]>(defaultProducts);
-  const [transactions, setTransactions] = useState<Transaction[]>(defaultTransactions);
-
-  // ============================================================
-  // 🔒 CEK AUTH + ROLE — WAJIB ADMIN
-  // ============================================================
   useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
     const token = tokenStorage.getToken();
-    const user = tokenStorage.getUser();
+    if (!token) return router.push("/login");
 
-    // 1. Belum login → redirect ke login
-    if (!token || !user) {
-      router.push("/");
-      return;
-    }
-
-    // 2. Role bukan ADMIN → tolak akses
-    if (user.role !== "ADMIN") {
-      alert("❌ Akses Ditolak. Hanya ADMIN yang bisa masuk ke dashboard web.");
-      tokenStorage.clear();
-      router.push("/");
-      return;
-    }
-
-    // 3. OK — set user & lanjut
-    setCurrentUser(user);
-    setIsChecking(false);
-  }, [router]);
-
-  // ============================================================
-  // LOAD DATA PRODUK DARI LOCALSTORAGE
-  // ============================================================
-  useEffect(() => {
-    if (isChecking) return;
-
-    const savedProducts = JSON.parse(localStorage.getItem("products") || "[]");
-
-    if (savedProducts.length > 0) {
-      const savedBySku = new Map(
-        savedProducts.map((product: Product) => [product.sku, product])
-      );
-
-      const updatedDefaultProducts = defaultProducts.map(
-        (product) => savedBySku.get(product.sku) || product
-      );
-
-      const customProducts = savedProducts.filter(
-        (product: Product) =>
-          !defaultProducts.some(
-            (defaultProduct) => defaultProduct.sku === product.sku
-          )
-      );
-
-      setProducts([...updatedDefaultProducts, ...customProducts]);
-    } else {
-      localStorage.setItem("products", JSON.stringify(defaultProducts));
-      setProducts(defaultProducts);
-    }
-  }, [isChecking]);
-
-  // ============================================================
-  // LOAD DATA TRANSAKSI DARI LOCALSTORAGE
-  // ============================================================
-  useEffect(() => {
-    if (isChecking) return;
-
-    const savedTransactions = localStorage.getItem("transactions");
-
-    if (savedTransactions) {
-      try {
-        setTransactions(JSON.parse(savedTransactions));
-      } catch {
-        localStorage.setItem("transactions", JSON.stringify(defaultTransactions));
-        setTransactions(defaultTransactions);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`);
+      const json = await res.json();
+      if (json.success) {
+        setProducts(json.data);
+        const lowStock = json.data.filter((p: any) => p.stock < 10).length;
+        const totalRev = json.data.reduce((acc: number, p: any) => acc + (p.price * p.stock), 0);
+        setStats({ total: json.data.length, lowStock, revenue: totalRev });
       }
-    } else {
-      localStorage.setItem("transactions", JSON.stringify(defaultTransactions));
-      setTransactions(defaultTransactions);
+    } catch (e) {
+      console.error(e);
     }
-  }, [isChecking]);
-
-  // ============================================================
-  // HANDLE LOGOUT
-  // ============================================================
-  const handleLogout = () => {
-    if (!confirm("Yakin ingin keluar?")) return;
-    tokenStorage.clear();
-    router.push("/");
   };
 
-  // ============================================================
-  // HITUNG STATISTIK
-  // ============================================================
-  const totalProducts = products.length;
-  const totalStock = products.reduce((total, p) => total + p.stock, 0);
-  const lowStockProducts = products.filter((p) => p.stock > 0 && p.stock <= 5);
-  const totalOrders = transactions.length;
-  const uniqueCustomers = new Set(transactions.map((t) => t.customer)).size;
-  const totalRevenue = transactions.reduce((total, t) => total + t.total, 0);
-
-  const formatRupiah = (value: number) => {
-    return `Rp ${value.toLocaleString("id-ID")}`;
+  const openStockModal = (product: any) => {
+    setSelectedProducts([product]);
+    setStockUpdates({ [product.id]: product.stock + 10 }); // Default tambah 10
+    setIsStockModalOpen(true);
   };
 
-  // ============================================================
-  // LOADING STATE
-  // ============================================================
-  if (isChecking) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          fontFamily: "sans-serif",
-          fontSize: "16px",
-          color: "#64748B",
-        }}
-      >
-        🔒 Memeriksa akses admin...
-      </div>
-    );
-  }
+  const handleSaveStock = async () => {
+    const token = tokenStorage.getToken();
+    const updates = selectedProducts.map((p) => ({
+      id: p.id,
+      newStock: stockUpdates[p.id],
+    }));
 
-  // ============================================================
-  // RENDER DASHBOARD
-  // ============================================================
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products/bulk-update-stock`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ updates }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setIsStockModalOpen(false);
+        setIsSuccessModalOpen(true); // Buka pop-up berhasil
+        fetchData();
+      } else {
+        alert(json.message);
+      }
+    } catch (e) {
+      alert("Koneksi gagal");
+    }
+  };
+
   return (
-    <div className="dashboard">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-logo">❄</div>
+    <div className="flex min-h-screen bg-[#F9F9FF]">
+      <Sidebar />
+      
+      <main className="ml-[256px] flex-1 p-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h2>Ikobana</h2>
-            <span>Frozenfood</span>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-sm text-gray-500">Ringkasan aktivitas dan performa Ikobana Frozen Food</p>
+          </div>
+          <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100 flex items-center gap-2">
+            <span className="text-blue-600 font-bold text-lg">📅</span>
+            <span className="text-sm font-semibold text-gray-700">Hari ini: {new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </div>
         </div>
 
-        <nav className="menu">
-          <Link className="menu-item active" href="/dashboard">
-            <span>▣</span>
-            Dashboard
-          </Link>
-          <Link className="menu-item" href="/products">
-            <span>▤</span>
-            Produk & Stok
-          </Link>
-          <Link className="menu-item" href="/transactions">
-            <span>▥</span>
-            Transaksi
-          </Link>
-          <Link className="menu-item" href="/settings">
-            <span>⚙</span>
-            Pengaturan
-          </Link>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <div className="admin-profile">
-            <div className="avatar">
-              {currentUser?.name?.charAt(0).toUpperCase() || "A"}
-            </div>
-            <div>
-              <strong>{currentUser?.name || "Admin"}</strong>
-              <small>{currentUser?.role || "Administrator"}</small>
-            </div>
+        {/* 4 Metric Cards */}
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase">Total Produk</p>
+            <h2 className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</h2>
+            <p className="text-xs text-blue-600 font-semibold mt-2">+4 produk baru</p>
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="logout"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              font: "inherit",
-              width: "100%",
-              textAlign: "left",
-              padding: "8px 12px",
-            }}
-          >
-            ↪ Keluar
-          </button>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase">Stok Menipis</p>
+            <h2 className="text-3xl font-bold text-gray-900 mt-2">{stats.lowStock}</h2>
+            <p className="text-xs text-red-600 font-semibold mt-2">Perhatian Segera</p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase">Total Transaksi</p>
+            <h2 className="text-3xl font-bold text-gray-900 mt-2">1.248</h2>
+            <p className="text-xs text-blue-600 font-semibold mt-2">+18.4% Bulan ini</p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase">Total Pendapatan</p>
+            <h2 className="text-2xl font-bold text-gray-900 mt-2">Rp {stats.revenue.toLocaleString('id-ID')}</h2>
+            <p className="text-xs text-blue-600 font-semibold mt-2">+12.5% Bulan ini</p>
+          </div>
         </div>
-      </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="dashboard-content">
-        {/* HEADER */}
-        <header className="dashboard-header">
-          <div>
-            <h1>Dashboard</h1>
-            <p>
-              Selamat datang kembali, <strong>{currentUser?.name || "Admin"}</strong>!
-            </p>
+        {/* Produk Stok Menipis Table (Poin 6: Tombol Update Stok) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-900">Produk Stok Menipis</h3>
+            <button onClick={() => router.push("/transactions")} className="text-sm text-blue-600 font-semibold hover:underline">
+              Lihat Semua Transaksi →
+            </button>
           </div>
-
-          <div className="header-right">
-            <button className="notification">🔔</button>
-            <div className="header-user">
-              <div className="avatar">
-                {currentUser?.name?.charAt(0).toUpperCase() || "A"}
-              </div>
-              <div>
-                <strong>{currentUser?.name || "Admin"}</strong>
-                <small>{currentUser?.email || "admin@ikobana.com"}</small>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* STATISTICS */}
-        <section className="statistics">
-          <div className="stat-card">
-            <div className="stat-icon blue">📦</div>
-            <div>
-              <p>Total Produk</p>
-              <h2>{totalProducts}</h2>
-              <span className="positive">{totalStock} total stok</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon green">🛒</div>
-            <div>
-              <p>Total Pesanan</p>
-              <h2>{totalOrders}</h2>
-              <span className="positive">Data transaksi</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon orange">👥</div>
-            <div>
-              <p>Total Pelanggan</p>
-              <h2>{uniqueCustomers}</h2>
-              <span className="positive">Pelanggan unik</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon purple">💰</div>
-            <div>
-              <p>Total Pendapatan</p>
-              <h2>{formatRupiah(totalRevenue)}</h2>
-              <span className="positive">Dari transaksi</span>
-            </div>
-          </div>
-        </section>
-
-        {/* CONTENT GRID */}
-        <section className="dashboard-grid">
-          {/* PENJUALAN */}
-          <div className="dashboard-card chart-card">
-            <div className="card-header">
-              <div>
-                <h3>Penjualan</h3>
-                <p>Statistik penjualan 7 hari terakhir</p>
-              </div>
-              <select>
-                <option>7 Hari</option>
-                <option>30 Hari</option>
-              </select>
-            </div>
-
-            <div className="chart">
-              <div className="chart-bar" style={{ height: "40%" }} />
-              <div className="chart-bar" style={{ height: "60%" }} />
-              <div className="chart-bar" style={{ height: "45%" }} />
-              <div className="chart-bar" style={{ height: "75%" }} />
-              <div className="chart-bar" style={{ height: "55%" }} />
-              <div className="chart-bar" style={{ height: "90%" }} />
-              <div className="chart-bar" style={{ height: "70%" }} />
-            </div>
-
-            <div className="chart-labels">
-              <span>Sen</span>
-              <span>Sel</span>
-              <span>Rab</span>
-              <span>Kam</span>
-              <span>Jum</span>
-              <span>Sab</span>
-              <span>Min</span>
-            </div>
-          </div>
-
-          {/* STOK MENIPIS */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <div>
-                <h3>Stok Menipis</h3>
-                <p>Produk yang perlu diperhatikan</p>
-              </div>
-              <Link href="/products">Lihat semua</Link>
-            </div>
-
-            <div className="stock-list">
-              {lowStockProducts.length > 0 ? (
-                lowStockProducts.map((product) => (
-                  <div className="stock-item" key={product.sku}>
-                    <div>
-                      <strong>{product.name}</strong>
-                      <small>SKU: {product.sku}</small>
-                    </div>
-                    <span
-                      className={
-                        product.stock <= 3 ? "stock-danger" : "stock-warning"
-                      }
-                    >
-                      {product.stock} tersisa
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p>Tidak ada produk dengan stok menipis.</p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* TRANSACTIONS */}
-        <section className="dashboard-card transaction-card">
-          <div className="card-header">
-            <div>
-              <h3>Transaksi Terbaru</h3>
-              <p>Daftar transaksi terbaru</p>
-            </div>
-            <Link href="/transactions">Lihat semua</Link>
-          </div>
-
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID Transaksi</th>
-                  <th>Pelanggan</th>
-                  <th>Tanggal</th>
-                  <th>Total</th>
-                  <th>Status</th>
+          
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-gray-500 uppercase text-[11px] font-bold">
+              <tr>
+                <th className="p-3 rounded-l-lg">Nama Produk</th>
+                <th className="p-3">Stok</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right rounded-r-lg">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.filter(p => p.stock < 10).map((p) => (
+                <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="p-3 font-semibold text-gray-800">{p.name}</td>
+                  <td className="p-3 font-bold text-red-600">{p.stock} box</td>
+                  <td className="p-3">
+                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold">Stok Menipis</span>
+                  </td>
+                  <td className="p-3 text-right">
+                    <button onClick={() => openStockModal(p)} className="bg-white border border-gray-200 text-blue-600 font-semibold px-3 py-1.5 rounded-lg shadow-sm hover:bg-gray-50">
+                      Update Stok
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id}>
-                    <td>#{transaction.id}</td>
-                    <td>{transaction.customer}</td>
-                    <td>{transaction.date}</td>
-                    <td>{formatRupiah(transaction.total)}</td>
-                    <td>
-                      <span
-                        className={
-                          transaction.status === "Selesai"
-                            ? "status success"
-                            : transaction.status === "Diproses"
-                            ? "status process"
-                            : "status pending"
-                        }
-                      >
-                        {transaction.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
+
+      {/* Pop-up Update Stok (Poin 6 & 12) */}
+      {isStockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-[576px] overflow-hidden">
+            <div className="bg-[#F0F3FF] p-6 flex justify-between items-center border-b border-gray-100">
+              <div>
+                <span className="text-[10px] font-bold bg-[#DBE1FF] text-[#00174B] px-2 py-0.5 rounded">IKOBANA FROZEN FOOD INVENTORY</span>
+                <h2 className="text-xl font-bold text-gray-900 mt-1">Update Stok Produk</h2>
+              </div>
+              <button onClick={() => setIsStockModalOpen(false)} className="text-gray-400 hover:text-gray-700 font-bold">✕</button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="bg-[#F0F3FF] p-4 rounded-xl flex justify-between items-center">
+                <div>
+                  <p className="font-bold text-gray-900">{selectedProducts[0]?.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">SKU: {selectedProducts[0]?.sku}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">Stok Saat Ini</p>
+                  <p className="text-lg font-bold text-blue-600">{selectedProducts[0]?.stock} box</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700">Jumlah Penyesuaian Baru</label>
+                <div className="flex items-center mt-1 bg-[#F0F3FF] rounded-lg p-2">
+                  <input
+                    type="number"
+                    className="flex-1 bg-transparent border-none focus:outline-none font-bold text-gray-900 pl-2"
+                    value={stockUpdates[selectedProducts[0]?.id] || 0}
+                    onChange={(e) => setStockUpdates({ ...stockUpdates, [selectedProducts[0].id]: Number(e.target.value) })}
+                  />
+                  <span className="text-sm font-semibold text-gray-500 pr-2">box</span>
+                </div>
+              </div>
+
+              <div className="bg-[#DEE8FF]/60 p-3 rounded-lg flex items-center gap-2 text-sm text-gray-700">
+                <span className="text-blue-600">📊</span> Proyeksi Total Stok Akhir: <b>{stockUpdates[selectedProducts[0]?.id] || 0} box</b>
+              </div>
+            </div>
+
+            <div className="bg-[#F0F3FF] p-6 flex justify-end gap-3">
+              <button onClick={handleSaveStock} className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-blue-700">Simpan Update Stok</button>
+              <button onClick={() => setIsStockModalOpen(false)} className="bg-red-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-red-700">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Berhasil Update Stok (Poin 12) */}
+      {isSuccessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] flex flex-col items-center text-center animate-fade-in">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Update Berhasil!</h2>
+            <div className="w-full bg-blue-50 border border-blue-100 text-blue-600 text-[11px] font-semibold py-2 rounded-lg mb-6">
+              ● Selamat datang di IKOBANA FROZEENFOOD
+            </div>
+            <button onClick={() => setIsSuccessModalOpen(false)} className="w-full border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50">
+              Kembali
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
