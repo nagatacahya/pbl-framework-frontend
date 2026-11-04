@@ -1,197 +1,124 @@
+// app/register/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authApi } from "@/lib/api";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function RegisterPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
   const router = useRouter();
+  const [form, setForm] = useState({ name: "", phone: "", email: "", password: "" });
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // State Pop-up
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleRegister = async () => {
-    setError("");
-    setSuccess("");
-
-    // Validasi
-    if (!name.trim() || !email.trim() || !phone.trim() || !password.trim()) {
-      setError("Semua field wajib diisi.");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("Password minimal 8 karakter.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Konfirmasi password tidak cocok.");
-      return;
-    }
-
-    setLoading(true);
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
-      const response = await authApi.register(name, email, phone, password);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-      if (response.success) {
-        setSuccess("Registrasi berhasil! Mengarahkan ke halaman login...");
-        setTimeout(() => {
-          router.push("/");
-        }, 2000);
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setShowSuccess(true); // Tampilkan Pop-up Berhasil
       } else {
-        setError(response.message || "Registrasi gagal.");
+        alert(json.message || "Registrasi gagal");
       }
     } catch (err) {
-      setError("Terjadi kesalahan. Coba lagi.");
+      alert("Gagal terhubung ke server");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <main className="register-page">
-      <div className="register-card">
-        {/* LOGO */}
-        <div className="logo">❄</div>
+    <div className="min-h-screen bg-[#F9F9FF] flex flex-col items-center py-10 px-4">
+      <div className="bg-white p-10 rounded-[24px] shadow-2xl w-full max-w-2xl relative">
+        
+        {/* Header */}
+        <div className="flex flex-col items-center mb-8">
+          <Image src="/images/logo-square.png" alt="Logo" width={84} height={84} className="mb-2" />
+          <p className="text-[#455F87] text-xs font-medium tracking-wide">Ikobana Frozen Food • Pendaftaran Akun Pengelola</p>
+          <h1 className="text-xl font-bold text-gray-900 mt-2">Daftar Akun Pengelola Toko</h1>
+          <p className="text-xs text-gray-500 text-center mt-2 max-w-md">
+            Mulai digitalisasi inventaris rantai dingin, kasir POS cerdas, dan orkestrasian pesanan online frozen food Anda.
+          </p>
+        </div>
 
-        {/* JUDUL */}
-        <h1>Ikobana Frozenfood</h1>
-        <p className="subtitle">Buat akun baru Anda</p>
-
-        {/* FORM */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleRegister();
-          }}
-        >
-          {/* ERROR */}
-          {error && (
-            <div
-              style={{
-                background: "#FEF2F2",
-                color: "#DC2626",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                fontSize: "13px",
-                marginBottom: "12px",
-                border: "1px solid #FEE2E2",
-              }}
-            >
-              ⚠️ {error}
-            </div>
-          )}
-
-          {/* SUCCESS */}
-          {success && (
-            <div
-              style={{
-                background: "#F0FDF4",
-                color: "#16A34A",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                fontSize: "13px",
-                marginBottom: "12px",
-                border: "1px solid #BBF7D0",
-              }}
-            >
-              ✅ {success}
-            </div>
-          )}
-
-          {/* NAMA */}
-          <label>Nama Lengkap</label>
-          <input
-            type="text"
-            placeholder="Masukkan nama lengkap"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={loading}
-          />
-
-          {/* EMAIL */}
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="Masukkan email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-          />
-
-          {/* NOMOR HP */}
-          <label>Nomor WhatsApp</label>
-          <input
-            type="tel"
-            placeholder="Contoh: 81234567890"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            disabled={loading}
-          />
-
-          {/* PASSWORD */}
-          <label>Password</label>
-          <div className="password-container">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Minimal 8 karakter"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Sembunyikan" : "Lihat"}
-            </button>
+        {/* Form */}
+        <form onSubmit={handleRegister} className="grid grid-cols-2 gap-4">
+          <div className="col-span-1">
+            <label className="text-xs font-semibold text-gray-700">Nama Lengkap Pemilik</label>
+            <input type="text" required className="w-full mt-1 p-2.5 bg-[#F0F3FF] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Siti Rahmawati" onChange={(e) => setForm({...form, name: e.target.value})} />
+          </div>
+          <div className="col-span-1">
+            <label className="text-xs font-semibold text-gray-700">Nomor WhatsApp Aktif</label>
+            <input type="text" required className="w-full mt-1 p-2.5 bg-[#F0F3FF] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+62 812-8921-3340" onChange={(e) => setForm({...form, phone: e.target.value})} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs font-semibold text-gray-700">Email Bisnis / Akun Utama</label>
+            <input type="email" required className="w-full mt-1 p-2.5 bg-[#F0F3FF] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="siti@ikobana.com" onChange={(e) => setForm({...form, email: e.target.value})} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs font-semibold text-gray-700">Kata Sandi</label>
+            <input type="password" required className="w-full mt-1 p-2.5 bg-[#F0F3FF] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" onChange={(e) => setForm({...form, password: e.target.value})} />
           </div>
 
-          {/* KONFIRMASI PASSWORD */}
-          <label>Konfirmasi Password</label>
-          <div className="password-container">
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Ulangi password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              {showConfirmPassword ? "Sembunyikan" : "Lihat"}
-            </button>
+          <div className="col-span-2 flex items-start gap-2 mt-2">
+            <input type="checkbox" required className="mt-1" />
+            <p className="text-xs text-gray-600">
+              Saya menyetujui <span className="text-blue-600 font-semibold">Syarat & Ketentuan</span> serta Standar Penanganan Rantai Dingin LOCALMART.
+            </p>
           </div>
 
-          {/* BUTTON */}
-          <button
-            type="submit"
-            className="register-button"
-            disabled={loading}
-          >
-            {loading ? "Memproses..." : "Daftar Akun"}
+          <button type="submit" disabled={isLoading} className="col-span-2 bg-[#004AC6] text-white font-bold text-sm py-3.5 rounded-xl mt-4 hover:bg-blue-700 transition">
+            {isLoading ? "Memproses..." : "Daftar & Buat Akun Toko Sekarang →"}
           </button>
         </form>
 
-        {/* LOGIN */}
-        <p className="login-text">
-          Sudah punya akun? <a href="/">Masuk sekarang</a>
-        </p>
+        <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col items-center gap-3">
+          <p className="text-sm text-gray-600">
+            Sudah memiliki akun pengelola?{" "}
+            <Link href="/login" className="text-blue-600 font-bold">
+              Masuk ke Akun Anda
+            </Link>
+          </p>
+        </div>
       </div>
-    </main>
+
+      {/* Pop-up Sukses (Poin 3) */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] flex flex-col items-center text-center animate-fade-in">
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Registrasi Berhasil!</h2>
+            <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+              Akun IKOBANA FROZENFOOD kamu berhasil dibuat. Sekarang kamu sudah bisa mulai berbelanja frozen food favoritmu.
+            </p>
+            <div className="w-full bg-blue-50 border border-blue-100 text-blue-600 text-[11px] font-semibold py-2 rounded-lg mb-6 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-blue-600 rounded-full"></span> Selamat datang di IKOBANA FROZEENFOOD
+            </div>
+            <button
+              onClick={() => router.push("/login")} // Kembali ke login (Poin 3)
+              className="w-full border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-xl hover:bg-blue-50 transition"
+            >
+              Ke Halaman Login
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
