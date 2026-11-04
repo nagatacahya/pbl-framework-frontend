@@ -1,360 +1,120 @@
+// app/transactions/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-
-type Transaction = {
-  id: string;
-  customer: string;
-  date: string;
-  total: number;
-  status: string;
-};
-
-const defaultTransactions: Transaction[] = [
-  {
-    id: "TRX-001",
-    customer: "Andi Saputra",
-    date: "30 Sep 2026",
-    total: 125000,
-    status: "Selesai",
-  },
-  {
-    id: "TRX-002",
-    customer: "Budi Santoso",
-    date: "29 Sep 2026",
-    total: 85000,
-    status: "Diproses",
-  },
-  {
-    id: "TRX-003",
-    customer: "Citra Lestari",
-    date: "28 Sep 2026",
-    total: 210000,
-    status: "Selesai",
-  },
-  {
-    id: "TRX-004",
-    customer: "Dimas Pratama",
-    date: "27 Sep 2026",
-    total: 75000,
-    status: "Menunggu",
-  },
-];
+import Sidebar from "../components/Sidebar";
+import { tokenStorage } from "@/lib/api";
+import { deleteTransactionAction } from "@/actions/transaction";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] =
-    useState<Transaction[]>(defaultTransactions);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [isDeleteSuccess, setIsDeleteSuccess] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Semua Status");
-  const [dateFilter, setDateFilter] = useState("");
-
-  // FORMAT RUPIAH
-  const formatRupiah = (value: number) => {
-    return `Rp ${value.toLocaleString("id-ID")}`;
-  };
-
-  // LOAD DATA TRANSAKSI
   useEffect(() => {
-    const savedTransactions = localStorage.getItem("transactions");
-
-    if (savedTransactions) {
-      try {
-        const parsedTransactions: Transaction[] =
-          JSON.parse(savedTransactions);
-
-        setTransactions(parsedTransactions);
-      } catch {
-        localStorage.setItem(
-          "transactions",
-          JSON.stringify(defaultTransactions)
-        );
-      }
-    } else {
-      localStorage.setItem(
-        "transactions",
-        JSON.stringify(defaultTransactions)
-      );
-    }
+    fetchTransactions();
   }, []);
 
-  // FILTER TRANSAKSI
-  const filteredTransactions = transactions.filter((transaction) => {
-    const searchValue = search.toLowerCase();
+  const fetchTransactions = async () => {
+    const token = tokenStorage.getToken();
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/transactions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = await res.json();
+    if (json.success) setTransactions(json.data);
+  };
 
-    const matchesSearch =
-      transaction.id.toLowerCase().includes(searchValue) ||
-      transaction.customer.toLowerCase().includes(searchValue);
-
-    const matchesStatus =
-      statusFilter === "Semua Status" ||
-      transaction.status === statusFilter;
-
-    const matchesDate =
-      dateFilter === "" ||
-      transaction.date.includes(
-        new Date(dateFilter).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      );
-
-    return matchesSearch && matchesStatus && matchesDate;
-  });
-
-  // STATISTIK
-  const totalTransactions = transactions.length;
-
-  const completedTransactions = transactions.filter(
-    (transaction) => transaction.status === "Selesai"
-  ).length;
-
-  const processingTransactions = transactions.filter(
-    (transaction) => transaction.status === "Diproses"
-  ).length;
-
-  const waitingTransactions = transactions.filter(
-    (transaction) => transaction.status === "Menunggu"
-  ).length;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const token = tokenStorage.getToken() || "";
+    const result = await deleteTransactionAction(deleteTarget.id, token);
+    if (result.success) {
+      setIsDeleteSuccess(true);
+      setDeleteTarget(null);
+      fetchTransactions();
+    } else {
+      alert(result.message);
+    }
+  };
 
   return (
-    <div className="dashboard-layout">
-
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-
-        <div className="sidebar-logo">
-          <h2>IKOBANA</h2>
-          <p>Frozen Food</p>
-        </div>
-
-        <nav className="sidebar-menu">
-
-          <Link href="/dashboard">
-            🏠 Dashboard
-          </Link>
-
-          <Link href="/products">
-            📦 Produk
-          </Link>
-
-          <Link href="/transactions" className="active">
-            🧾 Transaksi
-          </Link>
-
-          <Link href="/settings">
-            ⚙️ Pengaturan
-          </Link>
-
-        </nav>
-
-        <div className="sidebar-bottom">
-          <Link href="/">
-            🚪 Keluar
-          </Link>
-        </div>
-
-      </aside>
-
-      {/* MAIN */}
-      <main className="main-content">
-
-        {/* HEADER */}
-        <header className="dashboard-header">
-
+    <div className="flex min-h-screen bg-[#F9F9FF]">
+      <Sidebar />
+      
+      <main className="ml-[256px] flex-1 p-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1>Transaksi</h1>
-            <p>Kelola seluruh transaksi pelanggan</p>
+            <h1 className="text-2xl font-bold text-gray-900">Monitoring Transaksi</h1>
+            <p className="text-sm text-gray-500">Pantau seluruh transaksi yang masuk ke Ikobana Frozen Food</p>
           </div>
-
-          <div className="admin-profile">
-
-            <div className="admin-avatar">
-              A
-            </div>
-
-            <div>
-              <strong>Admin</strong>
-              <small>Administrator</small>
-            </div>
-
-          </div>
-
-        </header>
-
-        {/* STATISTIK */}
-        <div className="transaction-stats">
-
-          <div className="transaction-stat-card">
-            <span>Total Transaksi</span>
-            <strong>{totalTransactions}</strong>
-          </div>
-
-          <div className="transaction-stat-card">
-            <span>Selesai</span>
-            <strong>{completedTransactions}</strong>
-          </div>
-
-          <div className="transaction-stat-card">
-            <span>Diproses</span>
-            <strong>{processingTransactions}</strong>
-          </div>
-
-          <div className="transaction-stat-card">
-            <span>Menunggu</span>
-            <strong>{waitingTransactions}</strong>
-          </div>
-
         </div>
 
-        {/* CONTENT CARD */}
-        <section className="transaction-card">
-
-          <div className="transaction-card-header">
-
-            <div>
-              <h2>Daftar Transaksi</h2>
-              <p>Data transaksi pelanggan</p>
-            </div>
-
-            <div className="transaction-tools">
-
-              {/* SEARCH */}
-              <input
-                type="text"
-                placeholder="Cari transaksi..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
-              {/* FILTER STATUS */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option>Semua Status</option>
-                <option>Selesai</option>
-                <option>Diproses</option>
-                <option>Menunggu</option>
-              </select>
-
-              {/* FILTER TANGGAL */}
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-              />
-
-            </div>
-
-          </div>
-
-          {/* TABLE */}
-          <div className="transaction-table-wrapper">
-
-            <table className="transaction-table">
-
-              <thead>
-
-                <tr>
-                  <th>ID Transaksi</th>
-                  <th>Pelanggan</th>
-                  <th>Tanggal</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[#F0F3FF] text-gray-500 uppercase text-[11px] font-bold">
+              <tr>
+                <th className="p-4">ID Transaksi</th>
+                <th className="p-4">Tanggal</th>
+                <th className="p-4">Pelanggan</th>
+                <th className="p-4">Total Bayar</th>
+                <th className="p-4">Status</th>
+                <th className="p-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((trx) => (
+                <tr key={trx.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="p-4 font-bold text-blue-600">{trx.orderId}</td>
+                  <td className="p-4 text-gray-600">{new Date(trx.createdAt).toLocaleDateString("id-ID")}</td>
+                  <td className="p-4">
+                    <p className="font-semibold text-gray-800">{trx.customerName}</p>
+                    <p className="text-xs text-gray-500">{trx.customerPhone}</p>
+                  </td>
+                  <td className="p-4 font-bold text-gray-900">Rp {trx.totalPrice.toLocaleString("id-ID")}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${trx.status === "Berhasil" ? "bg-green-100 text-green-700" : trx.status === "Dibatalkan" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+                      {trx.status}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right">
+                    <button onClick={() => setDeleteTarget(trx)} className="text-red-600 text-xs font-bold hover:underline">Hapus</button>
+                  </td>
                 </tr>
-
-              </thead>
-
-              <tbody>
-
-                {filteredTransactions.length > 0 ? (
-
-                  filteredTransactions.map((transaction) => (
-
-                    <tr key={transaction.id}>
-
-                      <td>
-                        <strong>#{transaction.id}</strong>
-                      </td>
-
-                      <td>
-                        {transaction.customer}
-                      </td>
-
-                      <td>
-                        {transaction.date}
-                      </td>
-
-                      <td>
-                        <strong>
-                          {formatRupiah(transaction.total)}
-                        </strong>
-                      </td>
-
-                      <td>
-
-                        <span
-                          className={`transaction-status ${
-                            transaction.status === "Selesai"
-                              ? "status-success"
-                              : transaction.status === "Diproses"
-                              ? "status-process"
-                              : "status-waiting"
-                          }`}
-                        >
-                          {transaction.status}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <Link
-                          href={`/transactions/${transaction.id}`}
-                          className="detail-button"
-                        >
-                          Detail
-                        </Link>
-
-                      </td>
-
-                    </tr>
-
-                  ))
-
-                ) : (
-
-                  <tr>
-
-                    <td
-                      colSpan={6}
-                      style={{
-                        textAlign: "center",
-                        padding: "30px",
-                        color: "#777",
-                      }}
-                    >
-                      Tidak ada transaksi yang sesuai.
-                    </td>
-
-                  </tr>
-
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </section>
-
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
 
+      {/* Pop-up Konfirmasi Hapus (Poin 16) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[20px] shadow-2xl p-6 w-[338px] flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">!</div>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Pemberitahuan</h2>
+            <p className="text-[13px] text-gray-500 mb-6">Apakah Anda yakin ingin Menghapus Item ini?</p>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-lg">Batal</button>
+              <button onClick={handleDelete} className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-lg">Iya</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Berhasil Hapus (Poin 16) */}
+      {isDeleteSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Item Berhasil Dihapus</h2>
+            <button onClick={() => setIsDeleteSuccess(false)} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl mt-4">Kembali</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
