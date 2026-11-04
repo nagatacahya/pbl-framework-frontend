@@ -1,37 +1,40 @@
-// actions/product.ts
 "use server";
-
 import { productSchema } from "@/lib/schemas";
 
-export async function createProductAction(prevState: any, formData: FormData) {
-  // 1. Ambil data dari form
+export type ProductActionState = {
+  success: boolean;
+  message: string;
+  errors: Record<string, string[]>;
+};
+
+export async function createProductAction(
+  prevState: ProductActionState,
+  formData: FormData
+): Promise<ProductActionState> {
   const rawData = {
     name: formData.get("name"),
     category: formData.get("category"),
     price: formData.get("price"),
     stock: formData.get("stock"),
-    description: formData.get("description"),
-    token: formData.get("token"), // Token dikirim dari hidden input
+    description: formData.get("description") ?? "",
+    token: formData.get("token"),
   };
 
-  // 2. Validasi dengan Zod di Server
   const validated = productSchema.safeParse(rawData);
-  
   if (!validated.success) {
-    // Kembalikan error per field
     return {
       success: false,
-      errors: validated.error.flatten().fieldErrors,
+      message: "Periksa kembali form Anda",
+      errors: validated.error.flatten().fieldErrors as Record<string, string[]>,
     };
   }
 
-  // 3. Tembak API Express
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${rawData.token}`, 
+        Authorization: `Bearer ${rawData.token}`,
       },
       body: JSON.stringify({
         name: validated.data.name,
@@ -40,16 +43,20 @@ export async function createProductAction(prevState: any, formData: FormData) {
         stock: validated.data.stock,
         description: validated.data.description,
       }),
+      cache: "no-store",
     });
 
     const json = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(json.message || "Gagal menyimpan produk");
+    if (res.ok && json.success) {
+      return { success: true, message: json.message, errors: {} };
     }
 
-    return { success: true, message: "Produk berhasil ditambahkan!" };
+    return {
+      success: false,
+      message: json.message || `Gagal menyimpan produk`,
+      errors: json.errors ?? {},
+    };
   } catch (err: any) {
-    return { success: false, message: err.message };
+    return { success: false, message: "Koneksi ke server gagal", errors: {} };
   }
 }
