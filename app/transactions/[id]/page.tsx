@@ -1,259 +1,80 @@
+// app/transactions/[id]/page.tsx
 "use client";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-
-type Product = {
-  name: string;
-  quantity: number;
-  price: number;
-  total: number;
-  icon: string;
-};
-
-type Transaction = {
-  id: string;
-  customer: string;
-  email: string;
-  phone: string;
-  date: string;
-  status: string;
-  address: string;
-  district: string;
-  city: string;
-  postalCode: string;
-  products: Product[];
-  shipping: number;
-  payment: string;
-  paymentStatus: string;
-  paymentTime: string;
-};
-
-const defaultTransactions: Record<string, Transaction> = {
-  "TRX-001": {
-    id: "TRX-001", customer: "Andi Saputra", email: "andi@gmail.com", phone: "0812-1111-2222", date: "30 September 2026, 10:30 WIB", status: "Selesai", address: "Jl. Soekarno Hatta No. 15", district: "Kecamatan Lowokwaru", city: "Kota Malang, Jawa Timur", postalCode: "65141",
-    products: [{ name: "Chicken Nugget", quantity: 2, price: 30000, total: 60000, icon: "🍗" }, { name: "French Fries", quantity: 1, price: 25000, total: 25000, icon: "🍟" }],
-    shipping: 10000, payment: "Transfer Bank", paymentStatus: "Lunas", paymentTime: "30 September 2026, 10:35 WIB",
-  },
-  "TRX-002": {
-    id: "TRX-002", customer: "Budi Santoso", email: "budi@gmail.com", phone: "0812-3456-7890", date: "29 September 2026, 14:30 WIB", status: "Diproses", address: "Jl. Merdeka No. 10", district: "Kecamatan Lowokwaru", city: "Kota Malang, Jawa Timur", postalCode: "65141",
-    products: [{ name: "Chicken Nugget", quantity: 2, price: 30000, total: 60000, icon: "🍗" }, { name: "French Fries", quantity: 1, price: 25000, total: 25000, icon: "🍟" }],
-    shipping: 10000, payment: "Transfer Bank", paymentStatus: "Lunas", paymentTime: "29 September 2026, 14:35 WIB",
-  },
-  "TRX-003": {
-    id: "TRX-003", customer: "Citra Lestari", email: "citra@gmail.com", phone: "0813-5555-6666", date: "28 September 2026, 09:15 WIB", status: "Selesai", address: "Jl. Veteran No. 25", district: "Kecamatan Klojen", city: "Kota Malang, Jawa Timur", postalCode: "65111",
-    products: [{ name: "Chicken Nugget", quantity: 3, price: 30000, total: 90000, icon: "🍗" }, { name: "Sosis Frozen", quantity: 2, price: 50000, total: 100000, icon: "🌭" }],
-    shipping: 20000, payment: "QRIS", paymentStatus: "Lunas", paymentTime: "28 September 2026, 09:20 WIB",
-  },
-  "TRX-004": {
-    id: "TRX-004", customer: "Dimas Pratama", email: "dimas@gmail.com", phone: "0812-7777-8888", date: "27 September 2026, 16:00 WIB", status: "Menunggu", address: "Jl. Dinoyo No. 8", district: "Kecamatan Dinoyo", city: "Kota Malang, Jawa Timur", postalCode: "65144",
-    products: [{ name: "French Fries", quantity: 3, price: 25000, total: 75000, icon: "🍟" }],
-    shipping: 0, payment: "Transfer Bank", paymentStatus: "Menunggu", paymentTime: "-",
-  },
-};
+import { transactionService } from "@/services/transaction.service";
+import { Transaction } from "@/types";
 
 export default function TransactionDetail() {
   const params = useParams();
   const transactionId = String(params.id);
   const [transaction, setTransaction] = useState<Transaction | null>(null);
-  const [status, setStatus] = useState("Menunggu");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadTransaction = () => {
+    const fetchDetail = async () => {
       try {
-        const storedTransactions = localStorage.getItem("transactions");
-        let storedTransaction: Partial<Transaction> | undefined;
-
-        if (storedTransactions) {
-          const transactions = JSON.parse(storedTransactions);
-          if (Array.isArray(transactions)) {
-            storedTransaction = transactions.find((item: Transaction) => item.id === transactionId);
-          }
+        const res = await transactionService.getAll();
+        if (res.success) {
+          const found = res.data.find((t: Transaction) => t.orderId === transactionId || t.id === transactionId);
+          if (found) { setTransaction(found); setStatus(found.status); }
         }
-
-        const defaultTransaction = defaultTransactions[transactionId];
-
-        if (defaultTransaction) {
-          const mergedTransaction: Transaction = {
-            ...defaultTransaction,
-            ...(storedTransaction || {}),
-            products: storedTransaction?.products ?? defaultTransaction.products,
-          };
-          setTransaction(mergedTransaction);
-          setStatus(mergedTransaction.status);
-        } else if (storedTransaction) {
-          const safeTransaction: Transaction = {
-            id: storedTransaction.id || transactionId,
-            customer: storedTransaction.customer || "-",
-            email: storedTransaction.email || "-",
-            phone: storedTransaction.phone || "-",
-            date: storedTransaction.date || "-",
-            status: storedTransaction.status || "Menunggu",
-            address: storedTransaction.address || "-",
-            district: storedTransaction.district || "-",
-            city: storedTransaction.city || "-",
-            postalCode: storedTransaction.postalCode || "-",
-            products: storedTransaction.products || [],
-            shipping: storedTransaction.shipping || 0,
-            payment: storedTransaction.payment || "-",
-            paymentStatus: storedTransaction.paymentStatus || "-",
-            paymentTime: storedTransaction.paymentTime || "-",
-          };
-          setTransaction(safeTransaction);
-          setStatus(safeTransaction.status);
-        }
-      } catch (error) {
-        console.error("Gagal mengambil data transaksi:", error);
-      }
-      setLoading(false);
+      } catch (error) { console.error(error); } finally { setLoading(false); }
     };
-
-    loadTransaction();
+    fetchDetail();
   }, [transactionId]);
 
-  const handleUpdateStatus = () => {
+  const handleUpdateStatus = async () => {
     if (!transaction) return;
-    try {
-      const storedTransactions = localStorage.getItem("transactions");
-      let transactions: Transaction[] = [];
-
-      if (storedTransactions) {
-        const parsed = JSON.parse(storedTransactions);
-        if (Array.isArray(parsed)) transactions = parsed;
-      }
-
-      if (transactions.length === 0) transactions = Object.values(defaultTransactions);
-
-      const existingIndex = transactions.findIndex((item) => item.id === transaction.id);
-      if (existingIndex !== -1) {
-        transactions[existingIndex] = { ...transactions[existingIndex], ...transaction, status: status, products: transactions[existingIndex].products ?? transaction.products };
-      } else {
-        transactions.push({ ...transaction, status: status });
-      }
-
-      localStorage.setItem("transactions", JSON.stringify(transactions));
-      setTransaction({ ...transaction, status: status });
-      alert("Status transaksi berhasil diperbarui!");
-    } catch (error) {
-      alert("Gagal memperbarui status transaksi.");
-    }
+    await transactionService.updateStatus(transaction.id, status);
+    alert("Status transaksi berhasil diperbarui!");
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Memuat Detail Transaksi...</div>;
+  if (!transaction) return <div className="p-8"><h1 className="text-2xl font-bold">Transaksi Tidak Ditemukan</h1><Link href="/transactions" className="text-blue-600 font-semibold hover:underline mt-4 inline-block">← Kembali</Link></div>;
 
-  if (!transaction) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold">Transaksi Tidak Ditemukan</h1>
-        <p className="mt-2 text-gray-600">Data transaksi dengan ID <strong>{transactionId}</strong> tidak tersedia.</p>
-        <br />
-        <Link href="/transactions" className="back-transaction">← Kembali ke Transaksi</Link>
-      </div>
-    );
-  }
-
-  const subtotal = (transaction.products ?? []).reduce((total, product) => total + product.total, 0);
-  const grandTotal = subtotal + (transaction.shipping || 0);
+  let products = [];
+  try { products = JSON.parse(transaction.items || "[]"); } catch (e) { products = []; }
 
   return (
-    <div>
-      <header className="dashboard-header">
-        <div>
-          <h1>Detail Transaksi</h1>
-          <p>Informasi lengkap transaksi pelanggan</p>
-        </div>
-        <div className="admin-profile">
-          <div className="admin-avatar">A</div>
-          <div>
-            <strong>Admin</strong>
-            <small>Administrator</small>
-          </div>
-        </div>
-      </header>
+    <div className="p-8">
+      <header className="flex justify-between items-center mb-6"><div><h1 className="text-2xl font-bold text-gray-900">Detail Transaksi</h1><p className="text-sm text-gray-500">Informasi lengkap transaksi pelanggan</p></div></header>
+      <Link href="/transactions" className="text-blue-600 font-semibold hover:underline mb-6 inline-block">← Kembali ke Transaksi</Link>
 
-      <Link href="/transactions" className="back-transaction">← Kembali ke Transaksi</Link>
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div className="flex justify-between items-start mb-4"><div><h2 className="text-xl font-bold text-gray-900">{transaction.orderId}</h2><p className="text-sm text-gray-500">{new Date(transaction.createdAt).toLocaleString("id-ID")}</p></div><span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">{status}</span></div>
+        <div className="mt-4"><p className="text-xs font-bold text-gray-500 mb-2">BUKTI TRANSFER</p>{transaction.paymentProof ? <img src={transaction.paymentProof} alt="Bukti Transfer" className="w-full max-w-md h-64 object-contain border rounded-lg bg-gray-50" /> : <p className="text-sm text-red-500">Belum ada bukti transfer.</p>}</div>
+      </div>
 
-      <section className="transaction-detail-card">
-        <div className="transaction-detail-header">
-          <div>
-            <h2>#{transaction.id}</h2>
-            <p>{transaction.date}</p>
-          </div>
-          <span className={`transaction-status ${status === "Selesai" ? "status-success" : status === "Diproses" ? "status-process" : "status-waiting"}`}>
-            {status}
-          </span>
-        </div>
-      </section>
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><h3 className="font-bold text-gray-900 mb-4">Informasi Pelanggan</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-gray-500">Nama</span><strong>{transaction.customerName}</strong></div><div className="flex justify-between"><span className="text-gray-500">Telepon</span><strong>{transaction.customerPhone}</strong></div></div></div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"><h3 className="font-bold text-gray-900 mb-4">Alamat Pengiriman</h3><p className="text-sm text-gray-700 leading-relaxed">{transaction.customerAddress}</p></div>
+      </div>
 
-      <section className="transaction-detail-grid">
-        <div className="transaction-detail-card">
-          <h3>Informasi Pelanggan</h3>
-          <div className="detail-info">
-            <div><span>Nama Pelanggan</span><strong>{transaction.customer}</strong></div>
-            <div><span>Email</span><strong>{transaction.email}</strong></div>
-            <div><span>No. Telepon</span><strong>{transaction.phone}</strong></div>
-          </div>
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <h3 className="font-bold text-gray-900 mb-4">Update Status Transaksi</h3>
+        <div className="flex gap-4 items-center">
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="p-2.5 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="Menunggu Verifikasi">Menunggu Verifikasi</option><option value="Diproses">Diproses</option><option value="Dikirim">Dikirim</option><option value="Selesai">Selesai</option><option value="Dibatalkan">Dibatalkan</option></select>
+          <button onClick={handleUpdateStatus} className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-blue-700">Update Status</button>
         </div>
-        <div className="transaction-detail-card">
-          <h3>Alamat Pengiriman</h3>
-          <div className="detail-address">
-            <strong>{transaction.customer}</strong>
-            <p>{transaction.address}<br />{transaction.district}<br />{transaction.city}<br />{transaction.postalCode}</p>
-          </div>
-        </div>
-      </section>
+      </div>
 
-      <section className="transaction-detail-card">
-        <h3>Update Status Transaksi</h3>
-        <div className="status-update">
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="Menunggu">Menunggu</option>
-            <option value="Diproses">Diproses</option>
-            <option value="Selesai">Selesai</option>
-          </select>
-          <button onClick={handleUpdateStatus}>Update Status</button>
-        </div>
-      </section>
-
-      <section className="transaction-detail-card">
-        <h3>Produk yang Dibeli</h3>
-        {(transaction.products ?? []).length === 0 ? (
-          <p>Tidak ada data produk.</p>
-        ) : (
-          (transaction.products ?? []).map((product, index) => (
-            <div className="transaction-product" key={index}>
-              <div className="product-detail-info">
-                <div className="product-image">{product.icon}</div>
-                <div>
-                  <strong>{product.name}</strong>
-                  <p>{product.quantity} × Rp{product.price.toLocaleString("id-ID")}</p>
-                </div>
-              </div>
-              <strong>Rp{product.total.toLocaleString("id-ID")}</strong>
-            </div>
-          ))
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <h3 className="font-bold text-gray-900 mb-4">Produk yang Dibeli</h3>
+        {products.length === 0 ? <p className="text-sm text-gray-500">Tidak ada data produk.</p> : (
+          <div className="space-y-4">{products.map((product: any, index: number) => (
+            <div key={index} className="flex justify-between items-center border-b pb-4 last:border-0 last:pb-0"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">🍗</div><div><strong className="text-gray-900">{product.productName}</strong><p className="text-sm text-gray-500">{product.qty} × {product.price}</p></div></div><strong className="text-gray-900">{product.price}</strong></div>
+          ))}</div>
         )}
-      </section>
+      </div>
 
-      <section className="transaction-detail-card">
-        <h3>Ringkasan Pembayaran</h3>
-        <div className="payment-summary">
-          <div><span>Subtotal</span><strong>Rp{subtotal.toLocaleString("id-ID")}</strong></div>
-          <div><span>Ongkos Kirim</span><strong>Rp{(transaction.shipping || 0).toLocaleString("id-ID")}</strong></div>
-          <div className="payment-total"><span>Total Pembayaran</span><strong>Rp{grandTotal.toLocaleString("id-ID")}</strong></div>
-        </div>
-      </section>
-
-      <section className="transaction-detail-card">
-        <h3>Informasi Pembayaran</h3>
-        <div className="detail-info">
-          <div><span>Metode Pembayaran</span><strong>{transaction.payment}</strong></div>
-          <div><span>Status Pembayaran</span><strong className="payment-success">{transaction.paymentStatus}</strong></div>
-          <div><span>Waktu Pembayaran</span><strong>{transaction.paymentTime}</strong></div>
-        </div>
-      </section>
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="font-bold text-gray-900 mb-4">Ringkasan Pembayaran</h3>
+        <div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-gray-500">Metode Pembayaran</span><strong>{transaction.paymentMethod}</strong></div><div className="flex justify-between border-t pt-2 mt-2"><span className="font-bold text-gray-900">Total Pembayaran</span><strong className="text-blue-600 text-lg">Rp {transaction.totalPrice.toLocaleString("id-ID")}</strong></div></div>
+      </div>
     </div>
   );
 }
