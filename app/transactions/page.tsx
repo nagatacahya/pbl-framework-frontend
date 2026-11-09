@@ -14,18 +14,15 @@ export default function TransactionsPage() {
   const [newStatus, setNewStatus] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // ✅ Helper untuk memperbaiki URL gambar (mengganti IP lama dengan IP baru dari .env.local)
   const getValidImageUrl = (url: string) => {
     if (!url) return "";
     const newApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const baseUrl = newApiUrl.replace("/api", ""); // Hapus /api di akhir
-    
-    // Ganti semua kemungkinan IP lama dengan IP baru
+    const baseUrl = newApiUrl.replace("/api", "");
     return url
       .replace("http://localhost:5000", baseUrl)
       .replace("http://192.168.1.129:5000", baseUrl)
       .replace("http://10.200.118.253:5000", baseUrl)
-      .replace("http://10.200.116.23:5000", baseUrl); // IP baru
+      .replace("http://10.200.116.23:5000", baseUrl);
   };
 
   const handleUpdateStatus = async () => {
@@ -87,20 +84,13 @@ export default function TransactionsPage() {
                     <td className="p-4"><p className="font-semibold text-gray-800">{trx.customerName}</p><p className="text-xs text-gray-500">{trx.customerPhone}</p></td>
                     <td className="p-4 text-xs text-gray-600 max-w-[200px] truncate" title={parseItems(trx.items)}>{parseItems(trx.items)}</td>
                     <td className="p-4 font-bold text-gray-900">Rp {trx.totalPrice.toLocaleString("id-ID")}</td>
-                    
-                    {/* ✅ PERBAIKAN GAMBAR: Gunakan getValidImageUrl */}
                     <td className="p-4 text-center">
                       {trx.paymentProof ? (
                         <div className="relative w-12 h-12 mx-auto cursor-pointer group" onClick={() => setImagePreview(getValidImageUrl(trx.paymentProof))}>
-                          <img 
-                            src={getValidImageUrl(trx.paymentProof)} 
-                            alt="Bukti" 
-                            className="w-full h-full object-cover rounded-md border border-gray-200 group-hover:opacity-75 transition" 
-                          />
+                          <img src={getValidImageUrl(trx.paymentProof)} alt="Bukti" className="w-full h-full object-cover rounded-md border border-gray-200 group-hover:opacity-75 transition" />
                         </div>
                       ) : (<span className="text-xs text-gray-400 italic">-</span>)}
                     </td>
-
                     <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold ${getStatusStyle(trx.status)}`}>{trx.status}</span></td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
@@ -133,9 +123,15 @@ export default function TransactionsPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Ubah Status Pesanan</h2>
             <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100"><p className="text-xs font-bold text-gray-500 mb-1">ID TRANSAKSI</p><p className="font-bold text-blue-600">{statusTarget.orderId}</p><p className="text-sm text-gray-600 mt-1">{statusTarget.customerName}</p></div>
             <label className="text-xs font-bold text-gray-700 mb-1">Pilih Status Baru</label>
+            
+            {/* ✅ OPSI "Selesai" DIHAPUS */}
             <select className="w-full p-2.5 bg-gray-50 border rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-              <option value="Menunggu Verifikasi">Menunggu Verifikasi</option><option value="Diproses">Diproses</option><option value="Dikirim">Dikirim</option><option value="Selesai">Selesai</option><option value="Dibatalkan">Dibatalkan</option>
+              <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+              <option value="Diproses">Diproses</option>
+              <option value="Dikirim">Dikirim</option>
+              <option value="Dibatalkan">Dibatalkan</option>
             </select>
+
             <div className="flex gap-3">
               <button onClick={handleUpdateStatus} className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700">Simpan Status</button>
               <button onClick={() => setStatusTarget(null)} className="flex-1 bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-300">Batal</button>
