@@ -1,23 +1,46 @@
 // app/settings/edit-profile/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "../../components/Sidebar";
+import Sidebar from "@/components/layout/Sidebar";
+import { authService } from "@/services/auth.service";
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "Siti", email: "admin@ikobana.com", phone: "0812-3456-7890" });
-  const [originalForm] = useState({ name: "Siti", email: "admin@ikobana.com", phone: "0812-3456-7890" });
-  const [modal, setModal] = useState<{ type: "success" | "error" } | null>(null);
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [originalForm, setOriginalForm] = useState({ name: "", email: "", phone: "" });
+  const [modal, setModal] = useState<{ type: "success" | "error"; msg?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSave = () => {
-    // Jika tidak ada perubahan, munculkan error (Poin 11)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const res = await authService.getProfile();
+      if (res.success) {
+        setForm(res.data);
+        setOriginalForm(res.data);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
     if (JSON.stringify(form) === JSON.stringify(originalForm)) {
-      setModal({ type: "error" });
+      setModal({ type: "error", msg: "Tidak ada perubahan data." });
       return;
     }
-    setModal({ type: "success" });
+
+    setIsLoading(true);
+    const res = await authService.updateProfile(form.name, form.email, form.phone);
+    setIsLoading(false);
+
+    if (res.success) {
+      setModal({ type: "success" });
+      setOriginalForm(form);
+      window.dispatchEvent(new Event("profileUpdated"));
+    } else {
+      setModal({ type: "error", msg: res.message });
+    }
   };
 
   return (
@@ -48,32 +71,19 @@ export default function EditProfilePage() {
           </div>
 
           <div className="flex justify-end gap-3 mt-8">
-            <button onClick={() => router.push("/settings")} className="bg-red-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-red-700">
-              Batal
-            </button>
-            <button onClick={handleSave} className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-blue-700">
-              Simpan Perubahan
-            </button>
+            <button onClick={() => router.push("/settings")} className="bg-red-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-red-700">Batal</button>
+            <button onClick={handleSave} disabled={isLoading} className="bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50">{isLoading ? "Menyimpan..." : "Simpan Perubahan"}</button>
           </div>
         </div>
       </main>
 
-      {/* Pop-up Sukses/Error Edit Profil (Poin 11) */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-[340px] flex flex-col items-center text-center">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${modal.type === "success" ? "bg-blue-600" : "bg-red-600"}`}>
-               {modal.type === "success" ? "✓" : "!"}
-            </div>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${modal.type === "success" ? "bg-blue-600" : "bg-red-600"}`}>{modal.type === "success" ? "✓" : "!"}</div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">{modal.type === "success" ? "Update Berhasil!" : "EROR"}</h2>
-            {modal.type === "success" && (
-              <div className="w-full bg-blue-50 border border-blue-100 text-blue-600 text-[11px] font-semibold py-2 rounded-lg mb-4">
-                ● Selamat datang di IKOBANA FROZEENFOOD
-              </div>
-            )}
-            <button onClick={() => { setModal(null); if(modal.type === "success") router.push("/settings"); }} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl mt-2">
-              Kembali
-            </button>
+            {modal.type === "error" && <p className="text-xs text-gray-500 mb-6">{modal.msg}</p>}
+            <button onClick={() => { setModal(null); if(modal.type === "success") router.push("/settings"); }} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl mt-2">Kembali</button>
           </div>
         </div>
       )}
