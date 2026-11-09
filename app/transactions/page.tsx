@@ -14,6 +14,20 @@ export default function TransactionsPage() {
   const [newStatus, setNewStatus] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // ✅ Helper untuk memperbaiki URL gambar (mengganti IP lama dengan IP baru dari .env.local)
+  const getValidImageUrl = (url: string) => {
+    if (!url) return "";
+    const newApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const baseUrl = newApiUrl.replace("/api", ""); // Hapus /api di akhir
+    
+    // Ganti semua kemungkinan IP lama dengan IP baru
+    return url
+      .replace("http://localhost:5000", baseUrl)
+      .replace("http://192.168.1.129:5000", baseUrl)
+      .replace("http://10.200.118.253:5000", baseUrl)
+      .replace("http://10.200.116.23:5000", baseUrl); // IP baru
+  };
+
   const handleUpdateStatus = async () => {
     if (!statusTarget) return;
     await transactionService.updateStatus(statusTarget.id, newStatus);
@@ -73,13 +87,20 @@ export default function TransactionsPage() {
                     <td className="p-4"><p className="font-semibold text-gray-800">{trx.customerName}</p><p className="text-xs text-gray-500">{trx.customerPhone}</p></td>
                     <td className="p-4 text-xs text-gray-600 max-w-[200px] truncate" title={parseItems(trx.items)}>{parseItems(trx.items)}</td>
                     <td className="p-4 font-bold text-gray-900">Rp {trx.totalPrice.toLocaleString("id-ID")}</td>
+                    
+                    {/* ✅ PERBAIKAN GAMBAR: Gunakan getValidImageUrl */}
                     <td className="p-4 text-center">
                       {trx.paymentProof ? (
-                        <div className="relative w-12 h-12 mx-auto cursor-pointer group" onClick={() => setImagePreview(trx.paymentProof)}>
-                          <img src={trx.paymentProof} alt="Bukti" className="w-full h-full object-cover rounded-md border border-gray-200 group-hover:opacity-75 transition" />
+                        <div className="relative w-12 h-12 mx-auto cursor-pointer group" onClick={() => setImagePreview(getValidImageUrl(trx.paymentProof))}>
+                          <img 
+                            src={getValidImageUrl(trx.paymentProof)} 
+                            alt="Bukti" 
+                            className="w-full h-full object-cover rounded-md border border-gray-200 group-hover:opacity-75 transition" 
+                          />
                         </div>
                       ) : (<span className="text-xs text-gray-400 italic">-</span>)}
                     </td>
+
                     <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold ${getStatusStyle(trx.status)}`}>{trx.status}</span></td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2">
